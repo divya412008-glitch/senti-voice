@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SentiVoice — Emotion Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & Tokens ──────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:       #08090d;
+  --surface:  #0f1117;
+  --card:     #14161f;
+  --border:   rgba(255,255,255,0.07);
+  --text:     #eeeef2;
+  --muted:    #6b6e82;
+  --accent:   #7c6aff;
+  --accent2:  #ff6ab0;
+  --accent3:  #6affd4;
+  --happy:    #ffd166;
+  --sad:      #4cc9f0;
+  --angry:    #f72585;
+  --fearful:  #7b2d8b;
+  --surprised:#06d6a0;
+  --disgusted:#ef476f;
+  --neutral:  #8d99ae;
+  --r: 16px;
+  --ease: cubic-bezier(.22,.68,0,1.2);
+}
+
+html { scroll-behavior:smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Background FX ───────────────────────────────────────── */
+.bg-orbs {
+  position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden;
+}
+.orb {
+  position:absolute; border-radius:50%; filter:blur(80px); opacity:.18;
+  animation: float 12s ease-in-out infinite alternate;
+}
+.orb-1 { width:500px;height:500px;top:-120px;left:-80px;background:var(--accent); }
+.orb-2 { width:380px;height:380px;bottom:-80px;right:-60px;background:var(--accent2); animation-delay:-4s; }
+.orb-3 { width:260px;height:260px;top:50%;left:55%;background:var(--accent3); animation-delay:-8s; }
+@keyframes float {
+  from { transform:translate(0,0) scale(1); }
+  to   { transform:translate(30px,40px) scale(1.08); }
+}
+
+/* ── Grid Overlay ────────────────────────────────────────── */
+.grid-overlay {
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size:48px 48px;
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+.container {
+  position:relative; z-index:1;
+  max-width:860px; margin:0 auto;
+  padding:48px 24px 80px;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+header {
+  text-align:center; margin-bottom:56px;
+  animation: fadeUp .8s var(--ease) both;
+}
+.logo-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(124,106,255,.12); border:1px solid rgba(124,106,255,.3);
+  border-radius:999px; padding:6px 16px; margin-bottom:20px;
+  font-size:.78rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent); font-weight:500;
+}
+.logo-dot { width:7px;height:7px;border-radius:50%;background:var(--accent);
+  animation: pulse 1.8s ease infinite; }
+@keyframes pulse {
+  0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+h1 {
+  font-family:'Syne',sans-serif; font-size:clamp(2.4rem,6vw,4rem);
+  font-weight:800; line-height:1.05; margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--accent) 80%,var(--accent2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.tagline {
+  color:var(--muted); font-size:1.05rem; font-weight:300; letter-spacing:.01em;
+}
+
+/* ── Mode Tabs ───────────────────────────────────────────── */
+.mode-tabs {
+  display:flex; gap:8px; margin-bottom:28px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:4px;
+  animation: fadeUp .8s var(--ease) .1s both;
+}
+.tab {
+  flex:1; padding:10px 0; border:none; background:transparent;
+  color:var(--muted); font-family:'DM Sans',sans-serif;
+  font-size:.9rem; font-weight:500; border-radius:9px;
+  cursor:pointer; transition:all .25s;
+  display:flex; align-items:center; justify-content:center; gap:7px;
+}
+.tab:hover { color:var(--text); background:rgba(255,255,255,.04); }
+.tab.active {
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff; box-shadow:0 4px 20px rgba(124,106,255,.35);
+}
+.tab svg { width:15px;height:15px;fill:currentColor; }
+
+/* ── Input Card ──────────────────────────────────────────── */
+.input-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--r); padding:24px;
+  margin-bottom:24px;
+  animation: fadeUp .8s var(--ease) .2s both;
+  transition: border-color .3s;
+}
+.input-card:focus-within { border-color:rgba(124,106,255,.4); }
+
+.lang-selector {
+  display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
+}
+.lang-btn {
+  padding:5px 14px; border-radius:999px;
+  border:1px solid var(--border);
+  background:transparent; color:var(--muted);
+  font-size:.8rem; font-family:'DM Sans',sans-serif;
+  cursor:pointer; transition:all .2s;
+}
+.lang-btn:hover { border-color:var(--accent); color:var(--accent); }
+.lang-btn.active {
+  background:rgba(124,106,255,.15);
+  border-color:var(--accent); color:var(--accent); font-weight:500;
+}
+.lang-label {
+  font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); margin-bottom:10px; display:block;
+}
+
+textarea {
+  width:100%; min-height:130px; resize:vertical;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px;
+  color:var(--text); font-family:'DM Sans',sans-serif; font-size:1rem;
+  line-height:1.6; outline:none; transition:border-color .25s;
+}
+textarea::placeholder { color:var(--muted); }
+textarea:focus { border-color:rgba(124,106,255,.5); }
+
+.char-count {
+  text-align:right; font-size:.75rem; color:var(--muted);
+  margin-top:6px; margin-bottom:16px;
+}
+
+.analyze-btn {
+  width:100%; padding:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:10px;
+  color:#fff; font-family:'Syne',sans-serif;
+  font-size:1rem; font-weight:700; letter-spacing:.04em;
+  cursor:pointer; transition:all .25s var(--ease);
+  position:relative; overflow:hidden;
+}
+.analyze-btn::after {
+  content:''; position:absolute; inset:0;
+  background:rgba(255,255,255,0); transition:.25s;
+}
+.analyze-btn:hover::after { background:rgba(255,255,255,.1); }
+.analyze-btn:active { transform:scale(.98); }
+.analyze-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* ── Voice Section ───────────────────────────────────────── */
+.voice-panel {
+  text-align:center; padding:8px 0;
+}
+.voice-ring {
+  position:relative; width:100px;height:100px;
+  margin:0 auto 20px; cursor:pointer;
+}
+.voice-ring-inner {
+  width:100%;height:100%;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center;
+  transition: transform .2s var(--ease), box-shadow .2s;
+  box-shadow:0 0 0 0 rgba(124,106,255,0);
+}
+.voice-ring-inner:hover { transform:scale(1.05); box-shadow:0 0 0 12px rgba(124,106,255,.15); }
+.voice-ring-inner.recording {
+  animation: micPulse 1.4s ease infinite;
+}
+@keyframes micPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,106,176,.5)}
+  50%{box-shadow:0 0 0 24px rgba(255,106,176,0)}
+}
+.mic-icon { width:38px;height:38px;fill:#fff; }
+
+.voice-status {
+  font-size:.95rem; color:var(--muted); margin-bottom:12px;
+}
+.voice-status span { color:var(--accent2); font-weight:500; }
+
+.voice-transcript {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px; min-height:60px;
+  font-size:.95rem; color:var(--text); text-align:left;
+  line-height:1.6; margin-bottom:16px;
+}
+.voice-transcript.placeholder { color:var(--muted); font-style:italic; }
+
+/* ── Results ─────────────────────────────────────────────── */
+.results-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--r); padding:28px;
+  display:none;
+  animation: fadeUp .6s var(--ease) both;
+}
+.results-card.show { display:block; }
+
+.result-header {
+  display:flex; align-items:center; gap:16px; margin-bottom:28px;
+}
+.emotion-emoji {
+  font-size:3.2rem; line-height:1;
+  animation: emojiPop .5s var(--ease) both;
+}
+@keyframes emojiPop {
+  from{transform:scale(0) rotate(-20deg)} to{transform:scale(1) rotate(0)} }
+
+.emotion-meta h2 {
+  font-family:'Syne',sans-serif; font-size:1.7rem;
+  font-weight:800; text-transform:capitalize; margin-bottom:4px;
+}
+.sentiment-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 12px; border-radius:999px;
+  font-size:.78rem; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.sentiment-badge.Positive { background:rgba(106,255,212,.15); color:var(--accent3); border:1px solid rgba(106,255,212,.3); }
+.sentiment-badge.Negative { background:rgba(247,37,133,.15); color:var(--angry); border:1px solid rgba(247,37,133,.3); }
+.sentiment-badge.Neutral  { background:rgba(141,153,174,.15); color:var(--neutral); border:1px solid rgba(141,153,174,.3); }
+
+/* Confidence bar */
+.conf-row { margin-bottom:28px; }
+.conf-label { display:flex;justify-content:space-between; font-size:.82rem;
+  color:var(--muted); margin-bottom:8px; }
+.conf-label strong { color:var(--text); }
+.conf-track {
+  height:6px; background:rgba(255,255,255,.06); border-radius:999px; overflow:hidden;
+}
+.conf-fill {
+  height:100%; border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width 1s var(--ease);
+}
+
+/* Emotion Bars */
+.emotion-bars h3 {
+  font-family:'Syne',sans-serif; font-size:.88rem;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:16px; font-weight:700;
+}
+.emotion-row { margin-bottom:12px; }
+.emotion-row-top { display:flex;justify-content:space-between; font-size:.83rem; margin-bottom:5px; }
+.emotion-name { text-transform:capitalize; font-weight:500; }
+.emotion-pct  { color:var(--muted); font-size:.78rem; }
+.bar-track { height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden; }
+.bar-fill  { height:100%;border-radius:999px;transition:width 1s var(--ease);width:0; }
+
+/* Language tag */
+.detected-lang {
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:20px; padding:6px 14px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  border-radius:999px; font-size:.78rem; color:var(--muted);
+  letter-spacing:.06em; text-transform:uppercase;
+}
+.detected-lang strong { color:var(--text); text-transform:capitalize; }
+
+/* Source badge for voice */
+.source-voice {
+  margin-left:8px;
+  background:rgba(255,106,176,.12); border:1px solid rgba(255,106,176,.25);
+  color:var(--accent2); padding:3px 10px; border-radius:999px;
+  font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;
+}
+
+/* ── Error Toast ─────────────────────────────────────────── */
+.toast {
+  position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(80px);
+  background:#1a0a14; border:1px solid var(--angry);
+  color:var(--angry); padding:12px 24px; border-radius:10px;
+  font-size:.9rem; font-weight:500; transition:transform .4s var(--ease);
+  z-index:999; pointer-events:none;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ── Emotion Color Map ───────────────────────────────────── */
+.em-happy     { background:var(--happy); }
+.em-sad       { background:var(--sad); }
+.em-angry     { background:var(--angry); }
+.em-fearful   { background:var(--fearful); }
+.em-surprised { background:var(--surprised); }
+.em-disgusted { background:var(--disgusted); }
+.em-neutral   { background:var(--neutral); }
+
+/* ── Loader Dots ─────────────────────────────────────────── */
+.loader { display:none; justify-content:center; gap:6px; padding:6px 0; }
+.loader.show { display:flex; }
+.loader-dot {
+  width:8px;height:8px;border-radius:50%;
+  background:var(--accent); opacity:.3;
+  animation:dotBounce .8s ease infinite;
+}
+.loader-dot:nth-child(2){animation-delay:.15s}
+.loader-dot:nth-child(3){animation-delay:.3s}
+@keyframes dotBounce{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-5px)}}
+
+/* ── Utilities ───────────────────────────────────────────── */
+@keyframes fadeUp {
+  from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
+
+.hidden { display:none !important; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media(max-width:540px){
+  .container{padding:28px 14px 60px;}
+  h1{font-size:2.1rem;}
+  .mode-tabs{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-badge"><div class="logo-dot"></div> AI Emotion Engine</div>
+    <h1>SentiVoice</h1>
+    <p class="tagline">Multilingual · Emotion-Aware · Voice-Powered Sentiment Analysis</p>
+  </header>
+
+  <!-- Mode Tabs -->
+  <div class="mode-tabs">
+    <button class="tab active" onclick="switchMode('text')" id="tab-text">
+      <svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 4h12v2H3zm0 4h18v2H3zm0 4h12v2H3z"/></svg>
+      Text Analysis
+    </button>
+    <button class="tab" onclick="switchMode('voice')" id="tab-voice">
+      <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93H2c0 4.96 3.58 9.09 8.31 9.84V22h3.38v-4.16C18.42 17.09 22 12.96 22 8h-2c0 4.08-3.06 7.44-7 7.93V16h-2v-.07z"/></svg>
+      Voice Analysis
+    </button>
+  </div>
+
+  <!-- TEXT PANEL -->
+  <div id="text-panel">
+    <div class="input-card">
+      <span class="lang-label">Language Mode</span>
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="auto" onclick="setLang(this,'auto')">🌐 Auto-Detect</button>
+        <button class="lang-btn" data-lang="english" onclick="setLang(this,'english')">🇬🇧 English</button>
+        <button class="lang-btn" data-lang="tamil" onclick="setLang(this,'tamil')">🇮🇳 Tamil</button>
+        <button class="lang-btn" data-lang="tanglish" onclick="setLang(this,'tanglish')">✨ Tanglish</button>
+      </div>
+      <textarea
+        id="input-text"
+        placeholder="Type your text here… in English, தமிழ், or Tanglish da! 🎤"
+        oninput="updateCharCount()"
+        maxlength="2000"
+      ></textarea>
+      <div class="char-count"><span id="char-count">0</span> / 2000</div>
+      <div class="loader" id="text-loader">
+        <div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div>
+      </div>
+      <button class="analyze-btn" id="analyze-btn" onclick="analyzeText()">
+        ✦ Analyze Emotion
+      </button>
+    </div>
+  </div>
+
+  <!-- VOICE PANEL -->
+  <div id="voice-panel" class="hidden">
+    <div class="input-card">
+      <div class="voice-panel">
+        <div class="voice-ring" onclick="toggleRecording()">
+          <div class="voice-ring-inner" id="voice-ring">
+            <svg class="mic-icon" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93H2c0 4.96 3.58 9.09 8.31 9.84V22h3.38v-4.16C18.42 17.09 22 12.96 22 8h-2c0 4.08-3.06 7.44-7 7.93V16h-2v-.07z"/>
+            </svg>
+          </div>
+        </div>
+        <p class="voice-status" id="voice-status">Tap the mic to start speaking</p>
+        <div class="voice-transcript placeholder" id="voice-transcript">
+          Your speech will appear here…
+        </div>
+        <div class="loader" id="voice-loader">
+          <div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div>
+        </div>
+        <button class="analyze-btn" id="voice-analyze-btn" onclick="analyzeVoice()" disabled style="margin-top:4px;">
+          ✦ Analyze Voice Emotion
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-card" id="results-card">
+    <div class="result-header">
+      <div class="emotion-emoji" id="res-emoji">😊</div>
+      <div class="emotion-meta">
+        <h2 id="res-emotion">Happy</h2>
+        <span class="sentiment-badge" id="res-sentiment-badge">Positive</span>
+        <span class="source-voice hidden" id="res-source-voice">🎤 Voice</span>
+      </div>
+    </div>
+
+    <div class="conf-row">
+      <div class="conf-label">
+        <span>Confidence</span>
+        <strong id="conf-value">—</strong>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="conf-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="emotion-bars">
+      <h3>Emotion Breakdown</h3>
+      <div id="emotion-bars-container"></div>
+    </div>
+
+    <div>
+      <span class="detected-lang">
+        🌐 Detected Language: <strong id="res-lang">—</strong>
+      </span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const API = "http://127.0.0.1:5000";
+let selectedLang = "auto";
+let isRecording  = false;
+let recognition  = null;
+let transcribedText = "";
+
+// ── Mode Switch ────────────────────────────────────────────
+function switchMode(mode) {
+  document.getElementById("text-panel").classList.toggle("hidden", mode !== "text");
+  document.getElementById("voice-panel").classList.toggle("hidden", mode !== "voice");
+  document.getElementById("tab-text").classList.toggle("active", mode === "text");
+  document.getElementById("tab-voice").classList.toggle("active", mode === "voice");
+  hideResults();
+}
+
+// ── Language ───────────────────────────────────────────────
+function setLang(btn, lang) {
+  document.querySelectorAll(".lang-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  selectedLang = lang;
+}
+
+// ── Char Count ─────────────────────────────────────────────
+function updateCharCount() {
+  const val = document.getElementById("input-text").value.length;
+  document.getElementById("char-count").textContent = val;
+}
+
+// ── Text Analysis ──────────────────────────────────────────
+async function analyzeText() {
+  const text = document.getElementById("input-text").value.trim();
+  if (!text) { showToast("Please enter some text first!"); return; }
+
+  setLoading("text", true);
+  hideResults();
+
+  try {
+    const res = await fetch(`${API}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderResults(data, false);
+  } catch (e) {
+    showToast("Server error — make sure Flask is running on port 5000.");
+    console.error(e);
+  } finally {
+    setLoading("text", false);
+  }
+}
+
+// ── Voice ──────────────────────────────────────────────────
+function toggleRecording() {
+  if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    showToast("Speech recognition not supported in this browser. Try Chrome.");
+    return;
+  }
+  isRecording ? stopRecording() : startRecording();
+}
+
+function startRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous    = true;
+  recognition.interimResults = true;
+  recognition.lang          = "en-US";
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById("voice-ring").classList.add("recording");
+    document.getElementById("voice-status").innerHTML = "🔴 Recording… <span>tap to stop</span>";
+    setTranscript("", true);
+  };
+
+  recognition.onresult = (e) => {
+    let interim = "", final = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      e.results[i].isFinal ? final += t : interim += t;
+    }
+    transcribedText = final || interim;
+    setTranscript(transcribedText || "Listening…", !transcribedText);
+  };
+
+  recognition.onerror = (e) => {
+    showToast("Mic error: " + e.error);
+    stopRecording();
+  };
+
+  recognition.onend = () => { if (isRecording) stopRecording(); };
+
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  recognition && recognition.stop();
+  document.getElementById("voice-ring").classList.remove("recording");
+  document.getElementById("voice-status").textContent =
+    transcribedText ? "Speech captured! Now analyze ↓" : "Tap the mic to start speaking";
+  document.getElementById("voice-analyze-btn").disabled = !transcribedText;
+}
+
+function setTranscript(text, isPlaceholder) {
+  const el = document.getElementById("voice-transcript");
+  el.textContent = text || "Your speech will appear here…";
+  el.classList.toggle("placeholder", isPlaceholder || !text);
+}
+
+async function analyzeVoice() {
+  if (!transcribedText) { showToast("No speech detected yet!"); return; }
+
+  setLoading("voice", true);
+  hideResults();
+
+  try {
+    const res = await fetch(`${API}/analyze-voice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: transcribedText })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderResults(data, true);
+  } catch (e) {
+    showToast("Server error — make sure Flask is running on port 5000.");
+    console.error(e);
+  } finally {
+    setLoading("voice", false);
+  }
+}
+
+// ── Render Results ─────────────────────────────────────────
+const EMOTION_COLORS = {
+  happy:"#ffd166", sad:"#4cc9f0", angry:"#f72585",
+  fearful:"#7b2d8b", surprised:"#06d6a0", disgusted:"#ef476f", neutral:"#8d99ae"
+};
+
+function renderResults(data, isVoice) {
+  const card = document.getElementById("results-card");
+  card.classList.remove("show");
+
+  // Emoji + title
+  document.getElementById("res-emoji").textContent = data.emoji;
+  document.getElementById("res-emotion").textContent = data.dominant_emotion;
+
+  // Sentiment badge
+  const badge = document.getElementById("res-sentiment-badge");
+  badge.textContent = data.sentiment;
+  badge.className = `sentiment-badge ${data.sentiment}`;
+
+  // Voice badge
+  document.getElementById("res-source-voice").classList.toggle("hidden", !isVoice);
+
+  // Confidence
+  const conf = data.confidence;
+  document.getElementById("conf-value").textContent = conf + "%";
+  setTimeout(() => {
+    document.getElementById("conf-fill").style.width = conf + "%";
+  }, 80);
+
+  // Language
+  document.getElementById("res-lang").textContent = data.language;
+
+  // Emotion bars
+  const container = document.getElementById("emotion-bars-container");
+  container.innerHTML = "";
+  const scores = data.emotion_scores || {};
+  Object.entries(scores)
+    .sort((a,b)=>b[1]-a[1])
+    .forEach(([emotion, pct]) => {
+      const color = EMOTION_COLORS[emotion] || "#8d99ae";
+      const div = document.createElement("div");
+      div.className = "emotion-row";
+      div.innerHTML = `
+        <div class="emotion-row-top">
+          <span class="emotion-name">${emotion}</span>
+          <span class="emotion-pct">${pct}%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="${pct}" style="background:${color}; width:0%"></div>
+        </div>`;
+      container.appendChild(div);
+    });
+
+  // Show card then animate bars
+  setTimeout(() => {
+    card.classList.add("show");
+    card.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    document.querySelectorAll(".bar-fill").forEach(bar => {
+      bar.style.width = bar.dataset.w + "%";
+    });
+  }, 50);
+}
+
+// ── Helpers ────────────────────────────────────────────────
+function hideResults() {
+  document.getElementById("results-card").classList.remove("show");
+}
+
+function setLoading(mode, on) {
+  if (mode === "text") {
+    document.getElementById("text-loader").classList.toggle("show", on);
+    document.getElementById("analyze-btn").disabled = on;
+  } else {
+    document.getElementById("voice-loader").classList.toggle("show", on);
+    document.getElementById("voice-analyze-btn").disabled = on;
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+// Allow Ctrl+Enter to analyze
+document.getElementById("input-text").addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "Enter") analyzeText();
+});
+</script>
+</body>
+</html>
