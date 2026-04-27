@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sentiment Analyser</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+      text-align: center;
+      padding: 50px;
+      color: #333;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    textarea {
+      width: 60%;
+      height: 100px;
+      border-radius: 10px;
+      border: 2px solid #3498db;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    #result {
+      margin-top: 30px;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .emoji {
+      font-size: 40px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌈 Sentiment Analyser 🌈</h1>
+  <p>Type any sentence and discover its mood!</p>
+  
+  <form id="sentimentForm">
+    <textarea id="textInput" placeholder="Type your sentence here..."></textarea><br>
+    <button type="submit">Analyse Sentiment</button>
+  </form>
+  
+  <div id="result"></div>
+  <div class="emoji" id="emoji"></div>
+  
+  <script>
+    document.getElementById("sentimentForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const text = document.getElementById("textInput").value;
+      
+      const response = await fetch("/analyse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text })
+      });
+      
+      const data = await response.json();
+      document.getElementById("result").innerText = "Sentiment: " + data.sentiment;
+      document.getElementById("emoji").innerText = data.emoji;
+    });
+  </script>
+</body>
+</html>
